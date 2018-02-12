@@ -3,24 +3,21 @@ import time
 import SocketServer
 import SimpleHTTPServer
 
-PORT = 20000
+PORT = 12345
 
 class HTTPCacheRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
     def send_head(self):
 
-        if self.command != "POST" and self.headers.get('If-Modified-Since', None):
+        """First things first- making a basic server to serve files"""
+        
+        if self.command == "GET" :
 
             filename = self.path.strip("/")
 
             if os.path.isfile(filename):
 
-                a = time.strptime(time.ctime(os.path.getmtime(filename)), "%a %b %d %H:%M:%S %Y")
-                b = time.strptime(self.headers.get('If-Modified-Since', None), "%a %b  %d %H:%M:%S %Z %Y")
-
-                if a < b:
-
-                    self.send_response(304)
+                    self.send_response(200)
                     self.end_headers()
                     return None
 
@@ -29,12 +26,6 @@ class HTTPCacheRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def end_headers(self):
 
         filename = self.path.strip("/")
-
-        if filename == "2.binary":
-            self.send_header('Cache-control', 'no-cache')
-
-        else:
-            self.send_header('Cache-control', 'must-revalidate')
 
         SimpleHTTPServer.SimpleHTTPRequestHandler.end_headers(self)
 
@@ -46,3 +37,4 @@ s.allow_reuse_address = True
 print "Serving on port", PORT
 
 s.serve_forever()
+
