@@ -1,9 +1,16 @@
+"""A server to serve files and handle requests from a lower-level proxy server"""
+
+import sys
 import os
 import time
 import SocketServer
 import SimpleHTTPServer
 
-PORT = 20000
+
+if len(sys.argv) >= 2:
+    PORT = int(sys.argv[1])
+else:
+    PORT = 20000
 
 class HTTPCacheRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
@@ -16,14 +23,14 @@ class HTTPCacheRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             if os.path.isfile(filename):
 
                 a = time.strptime(time.ctime(os.path.getmtime(filename)), "%a %b %d %H:%M:%S %Y")
-                b = time.strptime(self.headers.get('If-Modified-Since', None), "%a %b  %d %H:%M:%S %Z %Y")
+                b = time.strptime(self.headers.get('If-Modified-Since', None), "%a %b %d %H:%M:%S %Y")
 
                 if a < b:
 
                     self.send_response(304)
                     self.end_headers()
                     return None
-
+                
         return SimpleHTTPServer.SimpleHTTPRequestHandler.send_head(self)
 
     def end_headers(self):
