@@ -1,5 +1,13 @@
-"""A proxy server that implements cacheing and interacts with another higher-level server"""
+#!/usr/bin/env python2
 
+
+"""
+	A proxy server that implements caching and interacts
+	with another higher-level server
+
+"""
+
+from __future__ import print_function
 import sys
 import os
 import time
@@ -7,64 +15,56 @@ import SocketServer
 import SimpleHTTPServer
 import httplib
 
-if len(sys.argv) >= 2:
-    PORT = int(sys.argv[1])
-else:
-    PORT = 12345
+actual = lambda x: os.path.join(os.getcwd(), 'cache', x)
 
+try:
+	MASTER_PORT = int(sys.argv[2])
+except:
+	MASTER_PORT = 20000
 
-if len(sys.argv) >= 3:
-    MASTER_PORT = int(sys.argv[2])
-else:
-    MASTER_PORT = 20000
+try:
+	PORT = int(sys.argv[1])
+except:
+	PORT = 12345
+
 
 class ProxyRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
-    """To handle requests for the proxy server and return cached pages if needed"""
+	"""
+		To handle requests for the proxy server and return cached pages if needed
 
-    # current assumption: all files requested are present on server
-    def do_GET(self):
+	"""
 
-        filename = self.path.strip("/")
+	def do_GET(self):
+		'''
+			# current assumption: all files requested are present on server
+		'''
+		filename = actual(self.path.strip("/"))
+		self.path = filename
+		# HTTP connection object
+		conn = httplib.HTTPConnection("127.0.0.1", MASTER_PORT)
 
-        # HTTP connection object
-        conn = httplib.HTTPConnection("127.0.0.1", MASTER_PORT)
+		if os.path.isfile(filename) and not self.headers.get('Cache-control', None) == 'no-cache':
+			filetime = time.ctime(os.path.getmtime(filename))
+			print("File time : ", filetime)
+			conn.request("GET", filename.rsplit('/')[-1], headers = {"If-Modified-Since" : filetime})
+			response = conn.getresponse()
+			if response.status != 304 :
+				os.remove(filename)
+				open(filename, "wb+").write(response.read())
 
-        if os.path.isfile(filename):
+		else :
+			conn.request("GET", filename.rsplit('/')[-1])
+			response = conn.getresponse()
+			open(filename, "wb+").write(response.read())
 
-            filetime = time.ctime(os.path.getmtime(filename))
+		SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
 
-            # test print
-            print filetime
+def main():
+	sock = SocketServer.ThreadingTCPServer(("", PORT), ProxyRequestHandler)
+	sock.allow_reuse_address = True
+	print("Server started at Port %d | %s" % (PORT, "127.0.0.1"))
+	sock.serve_forever()
 
-            conn.request("GET", filename, headers = {"If-Modified-Since" : filetime})
-
-            response = conn.getresponse()
-
-            if response.status != 304 :
-                os.remove(filename)
-
-                f = open(filename, "w+")
-                f.write(response.read())
-                f.close()
-
-            else :
-                pass
-
-        else :
-
-            conn.request("GET", filename)
-
-            response = conn.getresponse()
-
-            f = open(filename, "w+")
-            f.write(response.read())
-            f.close()
-
-        SimpleHTTPServer.SimpleHTTPRequestHandler.do_GET(self)
-
-
-sock = SocketServer.TCPServer(("", PORT), ProxyRequestHandler)
-
-print "serving at port", PORT
-sock.serve_forever()
+if __name__ == '__main__':
+	main()
